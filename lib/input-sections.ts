@@ -1,0 +1,4 @@
+export const inputSectionChoices=[{id:'situation',label:'현황'},{id:'purpose',label:'사업개요'},{id:'results',label:'추진현황'},{id:'plan',label:'향후계획'}] as const;
+export function validInputSections(value:unknown):value is string[]{return Array.isArray(value)&&value.length<=inputSectionChoices.length&&value.every(id=>inputSectionChoices.some(choice=>choice.id===id))&&new Set(value).size===value.length;}
+export function selectedInputSections(value:unknown):string[]{return validInputSections(value)?[...value]:inputSectionChoices.map(choice=>choice.id);}
+export function toggleInputSection(value:unknown,id:string){const selected=selectedInputSections(value);if(!inputSectionChoices.some(choice=>choice.id===id))return selected;return selected.includes(id)?selected.filter(item=>item!==id):[...selected,id];}

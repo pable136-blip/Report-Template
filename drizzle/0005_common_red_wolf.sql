@@ -1,0 +1,1 @@
+ALTER TABLE `report_workspaces` ADD `deleted_at` text;

@@ -1,0 +1,3 @@
+export function selectedProjects<T extends {id:string}>(rows:T[],ids:string[]|null):T[]{if(ids===null)return rows;const selected=new Set(ids);return rows.filter(row=>selected.has(row.id));}
+export function readSelection(value:string|null):string[]|null{if(value===null)return null;return [...new Set(value.split(',').filter(id=>/^[0-9a-f-]{36}$/i.test(id)))];}
+export function toggleProject<T extends {id:string}>(rows:T[],ids:string[]|null,id:string):string[]{const selected=new Set((ids===null?rows: selectedProjects(rows,ids)).map(row=>row.id));if(selected.has(id))selected.delete(id);else selected.add(id);return rows.filter(row=>selected.has(row.id)).map(row=>row.id);}

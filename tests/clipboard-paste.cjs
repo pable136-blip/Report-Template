@@ -1,0 +1,30 @@
+const fs=require('node:fs'),assert=require('node:assert/strict'),ts=require('typescript'),React=require('react');
+for(const ext of ['.ts','.tsx'])require.extensions[ext]=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText,f);
+const {clipboardFiles}=require('../lib/clipboard-files.ts');
+const shot=new File(['capture'],'capture.png',{type:'image/png'}),second=new File(['capture2'],'capture2.png',{type:'image/png'}),doc=new File(['document'],'notes.pdf',{type:'application/pdf'});
+const items=files=>({files:[],items:files.map(file=>({kind:'file',type:file.type,getAsFile:()=>file}))});
+assert.deepEqual(clipboardFiles(items([shot,second])),[shot,second]);
+assert.deepEqual(clipboardFiles({...items([shot]),files:[shot]}),[shot]);
+assert.deepEqual(clipboardFiles({files:[doc],items:[]}),[doc]);
+assert.deepEqual(clipboardFiles({files:[],items:[{kind:'string',type:'text/html'}]}),[]);
+const originals={useState:React.useState,useRef:React.useRef,useEffect:React.useEffect},oldFetch=global.fetch,oldDocument=global.document;
+let states=[],refs=[],effects=[],si=0,ri=0,images=[{id:'existing',name:'existing.png',layout:'inline',page:1}],ready=false;const uploads=[];
+React.useState=initial=>{const i=si++;if(!(i in states))states[i]=typeof initial==='function'?initial():initial;return [states[i],value=>states[i]=typeof value==='function'?value(states[i]):value];};
+React.useRef=initial=>{const i=ri++;return refs[i]||(refs[i]={current:initial});};React.useEffect=fn=>effects.push(fn);
+const {default:SectionImages}=require('../app/components/SectionImages.tsx'),{default:SlideText}=require('../app/components/SlideText.tsx');
+const render=()=>{si=ri=0;effects=[];return SectionImages({projectId:'own-business',ready,images,sectionLabel:'現況',bodyText:'기존 본문',onTextChange(){},onChange:next=>images=next});};
+function event(data){return {clipboardData:data,prevented:false,stopped:false,preventDefault(){this.prevented=true;},stopPropagation(){this.stopped=true;}};}
+const tick=()=>new Promise(resolve=>setImmediate(resolve));
+(async()=>{try{
+ let release;global.fetch=async(url,init)=>{const file=init.body.get('file');uploads.push({name:file.name,project:init.body.get('projectId'),origin:init.body.get('origin')});if(uploads.length===1)await new Promise(resolve=>release=resolve);return Response.json({id:'uploaded-'+file.name,name:file.name});};
+ let tree=render();const text=event({files:[],items:[]});tree.props.onPaste(text);assert.equal(text.prevented,false);
+ const first=event(items([shot]));tree.props.onPaste(first);assert.ok(first.prevented&&first.stopped);assert.equal(uploads.length,0);
+ ready=true;render();effects.forEach(fn=>fn());assert.equal(uploads.length,1);
+ tree=render();tree.props.onPaste(event({files:[second,doc],items:[]}));assert.equal(uploads.length,1);
+ release();await tick();render();effects.forEach(fn=>fn());await tick();assert.deepEqual(uploads.map(v=>v.name),['capture.png','capture2.png','notes.pdf']);assert.ok(uploads.every(v=>v.project==='own-business'&&v.origin==='department'));
+ assert.deepEqual(images.map(v=>v.id),['existing','uploaded-capture.png','uploaded-capture2.png']);assert.ok(images.every(image=>image.page===1));
+ states=[];refs=[];si=ri=0;const commands=[];global.document={execCommand:(...args)=>commands.push(args)};
+ tree=SlideText({value:'기존 글',label:'본문',onSave:async()=>{}});const editable=React.Children.toArray(tree.props.children)[0];const imageEvent=event(items([shot]));editable.props.onPaste(imageEvent);assert.equal(commands.length,0);assert.equal(imageEvent.stopped,false);assert.equal(imageEvent.prevented,true);
+ editable.props.onPaste(event({files:[],items:[],getData:()=>'<기존 글>'}));assert.deepEqual(commands,[['insertText',false,'<기존 글>']]);
+ console.log('PASS: screenshots via items/files, no duplicate upload, plain-text paste, draft queue, repeated paste while busy, scoped attachments and image paste preserves selected text');
+}finally{Object.assign(React,originals);global.fetch=oldFetch;if(oldDocument===undefined)delete global.document;else global.document=oldDocument;}})().catch(error=>{console.error(error);process.exitCode=1;});

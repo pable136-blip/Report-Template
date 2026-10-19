@@ -1,0 +1,18 @@
+'use client';
+import {workspaceUrl} from '../../lib/workspace-client';
+import {useEffect,useMemo,useRef,useState} from 'react';
+import {createFrameBatch} from '../../lib/frame-batch';
+import {normalizeBounds,percentStyle,fitImageBounds,resizeImageBounds,imageHandles,type ImageBounds} from '../../lib/image-layout';
+export default function ReportImage({id,name,initial,onSave,disabled=false,onSelect,onDelete}:{id:string;name:string;initial:ImageBounds;onSave:(bounds:ImageBounds)=>void;disabled?:boolean;onSelect?:()=>void;onDelete?:()=>void}){
+ const [bounds,setBounds]=useState(()=>normalizeBounds(initial)),[natural,setNatural]=useState<{id:string;width:number;height:number}|null>(null);
+ const frames=useMemo(()=>createFrameBatch(setBounds,callback=>requestAnimationFrame(callback),id=>cancelAnimationFrame(id)),[]);
+ useEffect(()=>()=>frames.cancel(),[frames]);
+ const drag=useRef<{x:number;y:number;width:number;height:number;bounds:ImageBounds;mode:string}|null>(null),latest=useRef(bounds);
+ const fitted=(b:ImageBounds)=>natural?.id===id?fitImageBounds(b,natural.width,natural.height):b;
+ useEffect(()=>{if(!drag.current){const next=normalizeBounds(initial);setBounds(next);latest.current=next;}},[id,initial.x,initial.y,initial.width,initial.height]);
+ function start(e:React.PointerEvent<HTMLElement>,mode:string){if(disabled||e.button!==0)return;onSelect?.();e.currentTarget.closest<HTMLElement>('figure')?.focus({preventScroll:true});e.preventDefault();e.stopPropagation();const rect=e.currentTarget.closest('figure')!.parentElement!.getBoundingClientRect();const visible=fitted(latest.current);latest.current=visible;drag.current={x:e.clientX,y:e.clientY,width:rect.width,height:rect.height,bounds:visible,mode};e.currentTarget.setPointerCapture(e.pointerId);}
+ function move(e:React.PointerEvent){const d=drag.current;if(!d||!d.width||!d.height)return;e.stopPropagation();latest.current=resizeImageBounds(d.bounds,d.mode,(e.clientX-d.x)/d.width*100,(e.clientY-d.y)/d.height*100);frames.push(latest.current);}
+ function finish(e:React.PointerEvent){e.stopPropagation();if(!drag.current)return;const before=drag.current.bounds;frames.flush();drag.current=null;if(['x','y','width','height'].some(key=>before[key as keyof ImageBounds]!==latest.current[key as keyof ImageBounds]))onSave(latest.current);}
+ function cancel(){const before=drag.current?.bounds;drag.current=null;frames.cancel();if(before){latest.current=before;setBounds(before);}}
+ return <figure className="reportdragimage" style={percentStyle(fitted(bounds))} tabIndex={disabled?-1:0} aria-label={name+' 이미지: 끌어 이동, 상하좌우 변과 모서리로 크기 조정, Delete로 삭제'} onKeyDown={e=>{if(e.key==='Delete'&&!disabled&&onDelete){e.preventDefault();e.stopPropagation();if(!e.repeat&&!e.nativeEvent.isComposing&&!drag.current)onDelete();return;}if(disabled||!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();e.stopPropagation();const step=e.shiftKey?5:1;const next=resizeImageBounds(fitted(latest.current),'move',e.key==='ArrowLeft'?-step:e.key==='ArrowRight'?step:0,e.key==='ArrowUp'?-step:e.key==='ArrowDown'?step:0);latest.current=next;setBounds(next);onSave(next);}} onPointerDown={e=>start(e,'move')} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel}><img draggable={false} onLoad={e=>setNatural({id,width:e.currentTarget.naturalWidth,height:e.currentTarget.naturalHeight})} src={workspaceUrl('/api/attachments?id='+encodeURIComponent(id)+'&inline=1')} alt={name}/>{imageHandles.map(handle=><span key={handle.id} className={'resizehandle '+handle.id} aria-label={name+' '+handle.label+' 크기 조절'} onPointerDown={e=>start(e,handle.id)} onPointerMove={move} onPointerUp={finish} onPointerCancel={cancel}/>)}</figure>;
+}

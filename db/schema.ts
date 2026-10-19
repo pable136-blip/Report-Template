@@ -1,0 +1,11 @@
+import {sqliteTable,text,integer} from 'drizzle-orm/sqlite-core';
+export const projects=sqliteTable('projects',{id:text('id').primaryKey(),workspaceId:text('workspace_id'),data:text('data').notNull(),sortOrder:integer('sort_order').notNull().default(0),revision:integer('revision').notNull().default(1),updated:text('updated').notNull()});
+export const settings=sqliteTable('settings',{key:text('key').primaryKey(),value:text('value').notNull()});
+export const attachments=sqliteTable('attachments',{id:text('id').primaryKey(),projectId:text('project_id').notNull(),workspaceId:text('workspace_id'),name:text('name').notNull(),size:integer('size').notNull(),uploaded:text('uploaded').notNull(),origin:text('origin').notNull().default('department')});
+export const reportWorkspaces=sqliteTable('report_workspaces',{id:text('id').primaryKey(),department:text('department').notNull(),title:text('title').notNull(),passwordHash:text('password_hash').notNull(),salt:text('salt').notNull(),created:text('created').notNull(),failures:integer('failures').notNull().default(0),lockedUntil:integer('locked_until').notNull().default(0),pinLength:integer('pin_length').notNull().default(0),deletedAt:text('deleted_at'),coordinatorHash:text('coordinator_hash')});
+export const reportSessions=sqliteTable('report_sessions',{tokenHash:text('token_hash').primaryKey(),workspaceId:text('workspace_id').notNull(),expires:integer('expires').notNull(),role:text('role').notNull().default('department'),department:text('department').notNull().default(''),adminSessionHash:text('admin_session_hash')});
+export const reportSettings=sqliteTable('report_settings',{id:text('id').primaryKey(),workspaceId:text('workspace_id').notNull(),key:text('key').notNull(),value:text('value').notNull()});
+
+export const reportAdminConfig=sqliteTable('report_admin_config',{id:integer('id').primaryKey(),passwordHash:text('password_hash').notNull(),salt:text('salt').notNull()});
+export const reportAdminSessions=sqliteTable('report_admin_sessions',{tokenHash:text('token_hash').primaryKey(),expires:integer('expires').notNull()});
+export const reportAdminAttempts=sqliteTable('report_admin_attempts',{clientKey:text('client_key').primaryKey(),attempts:integer('attempts').notNull(),resetAt:integer('reset_at').notNull()});

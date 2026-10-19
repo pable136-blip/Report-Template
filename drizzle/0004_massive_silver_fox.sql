@@ -1,0 +1,1 @@
+ALTER TABLE `report_workspaces` ADD `pin_length` integer DEFAULT 0 NOT NULL;
